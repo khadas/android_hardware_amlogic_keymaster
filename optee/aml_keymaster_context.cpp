@@ -68,10 +68,10 @@ static keymaster_error_t AmlSetAuthorizations(const AuthorizationSet& key_descri
             case KM_TAG_KEY_SIZE:
             case KM_TAG_DIGEST:
             case KM_TAG_PADDING:
+            case KM_TAG_PURPOSE:
                 enforced->push_back(entry);
                 break;
 #if 0
-            case KM_TAG_PURPOSE:
             case KM_TAG_BLOCK_MODE:
             case KM_TAG_CALLER_NONCE:
             case KM_TAG_MIN_MAC_LENGTH:
@@ -203,7 +203,7 @@ static keymaster_error_t validate_ec_specific_new_key_params(
 {
     keymaster_error_t error = KM_ERROR_OK;
     UniquePtr<EVP_PKEY, EVP_PKEY_Delete> pkey;
-    UniquePtr<EC_KEY, EC_Delete> ec_key;
+    UniquePtr<EC_KEY, EC_KEY_Delete> ec_key;
     uint32_t key_size_bits_from_tag = 0;
     size_t key_size_bits_from_key = 0;
 
@@ -215,7 +215,7 @@ static keymaster_error_t validate_ec_specific_new_key_params(
     if (!ec_key.get())
         return TranslateLastOpenSslError();
 
-    error = EcKeyFactory::get_group_size(*EC_KEY_get0_group(ec_key.get()), &key_size_bits_from_key);
+    error = ec_get_group_size(EC_KEY_get0_group(ec_key.get()), &key_size_bits_from_key);
     if (error != KM_ERROR_OK)
         return error;
 

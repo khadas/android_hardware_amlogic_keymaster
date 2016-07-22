@@ -42,7 +42,7 @@ TEEC_Result generate_dsa_keypair_ca(uint8_t *id, uint32_t id_len,
         const keymaster_dsa_keygen_params_t* dsa_params);
 
 TEEC_Result generate_ec_keypair(uint8_t *id, uint32_t id_len,
-        const keymaster_ec_keygen_params_t* ec_params);
+        const uint32_t key_size, const uint32_t curve);
 
 TEEC_Result generate_rsa_keypair_ca(uint8_t *id, uint32_t id_len,
         const keymaster_rsa_keygen_params_t* rsa_params);
@@ -54,7 +54,7 @@ TEEC_Result generate_symmetric_key(uint8_t *id, uint32_t id_len,
 TEEC_Result do_import_keypair_tee_ca(
         const uint8_t* key, const size_t key_file_len,
         const uint32_t key_type, const uint32_t real_key_bits,
-        uint8_t *id, uint32_t id_len);
+        uint8_t *id, uint32_t id_len, uint32_t curve);
 
 TEEC_Result do_import_symmetric_key_tee_ca(
         const uint8_t* key,

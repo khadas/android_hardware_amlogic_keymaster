@@ -929,6 +929,7 @@ static bool is_public_key_operation(const keymaster_algorithm_t algorithm,
             return true;
         case KM_PURPOSE_SIGN:
         case KM_PURPOSE_DECRYPT:
+        case KM_PURPOSE_DERIVE_KEY:
             return false;
     };
 
@@ -1413,8 +1414,11 @@ static keymaster_error_t free_and_cleanup_op(am_operations_t* handles)
     if (handles) {
         if (oph->op) {
             error = KM1_free_operation(oph->op);
-            if (error != KM_ERROR_OK)
-                LOG_D("[free_and_cleanup_op]: KM1_free_operation(%p) failed\n", oph->op);
+            if (error != KM_ERROR_OK) {
+                LOG_D("[free_and_cleanup_op]: KM1_free_operation(%p) failed.\n", oph->op);
+                /* this must be a bad handle */
+                return KM_ERROR_INVALID_OPERATION_HANDLE;
+            }
         }
         if (oph->key) {
             error = KM1_release_key(oph->key);

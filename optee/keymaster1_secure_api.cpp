@@ -26,6 +26,43 @@ using namespace keymaster;
 #define LOG_TAG "AmlKeyMaster"
 #endif
 
+static uint32_t android_curve_to_optee(keymaster_ec_curve_t curve)
+{
+    switch (curve)
+    {
+        case KM_EC_CURVE_P_224: return TEE_ECC_CURVE_NIST_P224;
+        case KM_EC_CURVE_P_256: return TEE_ECC_CURVE_NIST_P256;
+        case KM_EC_CURVE_P_384: return TEE_ECC_CURVE_NIST_P384;
+        case KM_EC_CURVE_P_521: return TEE_ECC_CURVE_NIST_P521;
+        default: return 0;
+    }
+}
+
+static uint32_t ecdsa_get_curve_tee(const uint32_t key_size) {
+    uint32_t curve = 0xFF;
+
+    switch (key_size) {
+        case 192: curve = TEE_ECC_CURVE_NIST_P192; break;
+        case 224: curve = TEE_ECC_CURVE_NIST_P224; break;
+        case 256: curve = TEE_ECC_CURVE_NIST_P256; break;
+        case 384: curve = TEE_ECC_CURVE_NIST_P384; break;
+        case 521: curve = TEE_ECC_CURVE_NIST_P521; break;
+        default: curve = 0xFF; break;
+    }
+    return curve;
+}
+
+static uint32_t ecdsa_get_keysize(const uint32_t curve) {
+    switch (curve) {
+        case TEE_ECC_CURVE_NIST_P192: return 192;
+        case TEE_ECC_CURVE_NIST_P224: return 224;
+        case TEE_ECC_CURVE_NIST_P256: return 256;
+        case TEE_ECC_CURVE_NIST_P384: return 384;
+        case TEE_ECC_CURVE_NIST_P521: return 521;
+        default: return 0;
+    }
+}
+
 static uint32_t android_digest_to_optee(keymaster_digest_t digest)
 {
     switch (digest)
@@ -102,6 +139,7 @@ int KM_secure_import_keypair(const keymaster1_device_t* dev __unused,
     EVP_PKEY *pkey = NULL;
     const uint8_t* temp = key;
     int ret = -1; /* Default */
+    uint32_t curve = 0;
 
     /* Sanity Check */
     if (false == get_ca_inited()) {
@@ -133,6 +171,7 @@ int KM_secure_import_keypair(const keymaster1_device_t* dev __unused,
             break;
         case EVP_PKEY_EC:
             aml_key->optee_obj_type = TEE_TYPE_ECDSA_KEYPAIR;
+            curve = ecdsa_get_curve_tee(aml_key->key_len);
             break;
         default:
             LOG_D("%s:%d: Unsupport key type\n",__func__, __LINE__);
@@ -140,7 +179,7 @@ int KM_secure_import_keypair(const keymaster1_device_t* dev __unused,
     }
     /* Generate Keypair */
     res = do_import_keypair_tee_ca(key, key_bin_len, aml_key->optee_obj_type,
-            aml_key->key_len, aml_key->handle, sizeof(aml_key->handle));
+            aml_key->key_len, aml_key->handle, sizeof(aml_key->handle), curve);
     if (res != TEEC_SUCCESS) {
         LOG_D("do_import_keypair_tee_ca failed: %zd %x\n", key_bin_len, aml_key->optee_obj_type);
         goto out;
@@ -328,22 +367,42 @@ keymaster_error_t KM1_secure_generate_key(
         aml_key->key_len = rsa_params.modulus_size;
         aml_key->optee_obj_type = TEE_TYPE_RSA_KEYPAIR;
     } else if (KM_ALGORITHM_EC == algo) {
-        keymaster_ec_keygen_params_t ec_params = {.field_size = 0};
-        if (!authorizations.GetTagValue(TAG_KEY_SIZE, &ec_params.field_size)) {
+        uint32_t key_size = 0;
+        uint32_t curve_type = 0;
+        keymaster_ec_curve_t curve = KM_EC_CURVE_P_224;
+        if (!authorizations.GetTagValue(TAG_KEY_SIZE, &key_size)) {
             LOG_D("No key size specified for EC key generation", 0);
-            return KM_ERROR_UNSUPPORTED_KEY_SIZE;
+        } else {
+            ret = check_ec_keygen_param(key_size);
+            if (ret != KM_ERROR_OK) {
+                LOG_D("%s:%d: check_ec_keygen_param failed\n", __func__, __LINE__);
+                goto out;
+            }
+            curve_type = ecdsa_get_curve_tee(key_size);
         }
-        ret = check_ec_keygen_param(ec_params.field_size);
-        if (ret != KM_ERROR_OK) {
-            LOG_D("%s:%d: check_ec_keygen_param failed\n", __func__, __LINE__);
+        if (!authorizations.GetTagValue(TAG_EC_CURVE, &curve)) {
+            LOG_D("No EC curve specified for EC key generation", 0);
+        } else {
+            if (key_size && android_curve_to_optee(curve) != ecdsa_get_curve_tee(key_size)) {
+                LOG_D("EC curve differs from key size", 0);
+                ret = KM_ERROR_INVALID_ARGUMENT;
+                goto out;
+            } else {
+                curve_type = android_curve_to_optee(curve);
+                key_size = ecdsa_get_keysize(curve_type);
+            }
+        }
+        if (!curve_type) {
+            ret = KM_ERROR_UNSUPPORTED_KEY_SIZE;
             goto out;
         }
-        if (TEEC_SUCCESS != generate_ec_keypair(aml_key->handle, sizeof(aml_key->handle), &ec_params)) {
-            LOG_D("%s:%d: generate_ec_keypair failed\n", __func__, __LINE__);
+        if (TEEC_SUCCESS != generate_ec_keypair(aml_key->handle, sizeof(aml_key->handle),
+                    key_size, curve_type)) {
+            LOG_D("%s:%d: generate_ec_keypair failed for %d\n", __func__, __LINE__, curve_type);
             ret = KM_ERROR_UNKNOWN_ERROR;
             goto out;
         }
-        aml_key->key_len = ec_params.field_size;
+        aml_key->key_len = key_size;
         aml_key->optee_obj_type = TEE_TYPE_ECDSA_KEYPAIR;
     } else if (KM_ALGORITHM_AES == algo) {
         if (TEEC_SUCCESS != generate_symmetric_key(aml_key->handle, sizeof(aml_key->handle),
@@ -954,7 +1013,7 @@ keymaster_error_t KM1_asymmetric_sign_with_handle(
 
     /* Add TEE_ATTR_RSA_PSS_SALT_LENGTH */
     add_attr_value(&num_algo_params, algo_params, TEE_ATTR_RSA_PSS_SALT_LENGTH,
-            SALT_LEN, 0);
+            TEE_ATTR_RSA_PSS_SALT_LENGTH, 0);
 
     if (op_mode == TEE_MODE_DECRYPT || op_mode == TEE_MODE_SIGN) {
         res = asymmetric_sign_tee_ca(op, op_mode,

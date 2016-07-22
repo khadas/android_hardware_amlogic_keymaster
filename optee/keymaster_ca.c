@@ -611,32 +611,6 @@ error:
 
 }
 
-static uint32_t ecdsa_get_curve_tee(const uint32_t field_size) {
-    uint32_t curve = 0xFF;
-
-    switch (field_size) {
-        case 192:
-            curve = TEE_ECC_CURVE_NIST_P192;
-            break;
-        case 224:
-            curve = TEE_ECC_CURVE_NIST_P224;
-            break;
-        case 256:
-            curve = TEE_ECC_CURVE_NIST_P256;
-            break;
-        case 384:
-            curve = TEE_ECC_CURVE_NIST_P384;
-            break;
-        case 521:
-            curve = TEE_ECC_CURVE_NIST_P521;
-            break;
-        default:
-            curve = 0xFF;
-            break;
-    }
-    return curve;
-}
-
 TEEC_Result get_keypair_public_ca(const TEE_ObjectHandle handle,
         uint8_t** x509_data, size_t* x509_data_len)
 {
@@ -812,22 +786,19 @@ TEEC_Result generate_symmetric_key(uint8_t *id, uint32_t id_len,
     return res;
 }
 
-TEEC_Result generate_ec_keypair(uint8_t *id, uint32_t id_len, const keymaster_ec_keygen_params_t* ec_params)
+TEEC_Result generate_ec_keypair(uint8_t *id, uint32_t id_len,
+        const uint32_t key_size, const uint32_t curve)
 {
     TEE_Attribute attrs[4];
     TEEC_Result res = TEEC_ERROR_GENERIC;
     size_t attr_count = 0;
-    uint32_t curve = 0;
 
     memset(attrs, 0x0, sizeof(attrs));
-    /* field size */
-    if (ec_params->field_size) {
-        curve = ecdsa_get_curve_tee(ec_params->field_size);
-        //TODO: which attr need to be filled with field_size
+	if (curve) {
         add_attr_value(&attr_count, attrs, TEE_ATTR_ECC_CURVE,
                 curve, 0);
     }
-    res = generate_key_tee_ca(TEE_TYPE_ECDSA_KEYPAIR, ec_params->field_size,
+    res = generate_key_tee_ca(TEE_TYPE_ECDSA_KEYPAIR, key_size,
             id, id_len, attrs, attr_count);
     if (res != TEEC_SUCCESS) {
         LOG_D("Error: generate_key_tee_ca failed.(%x)\n", res);
@@ -932,7 +903,7 @@ TEEC_Result digest_do_final_ca(TEE_OperationHandle oph,
 TEEC_Result do_import_keypair_tee_ca(
         const uint8_t* key, const size_t key_file_len,
         const uint32_t key_type, const uint32_t real_key_bits,
-        uint8_t *id, uint32_t id_len)
+        uint8_t *id, uint32_t id_len, uint32_t curve)
 {
     TEE_Attribute attrs[4];
     size_t attr_count = 0;
@@ -946,11 +917,9 @@ TEEC_Result do_import_keypair_tee_ca(
     /* Init attrs buffer */
     memset(attrs, 0x0, sizeof(attrs));
     if (key_type == TEE_TYPE_ECDSA_KEYPAIR) {
-        uint32_t curve = 0;
         /* pack raw data */
         add_attr(&attr_count, attrs, TEE_ATTR_PKCS8_BASE, key, key_file_len);
         /* pack curve */
-        curve = ecdsa_get_curve_tee(real_key_bits);
         add_attr_value(&attr_count, attrs, TEE_ATTR_ECC_CURVE, curve, 0);
     } else if (key_type == TEE_TYPE_RSA_KEYPAIR) {
         /* pack raw data */

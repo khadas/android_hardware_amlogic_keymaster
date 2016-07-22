@@ -59,7 +59,7 @@ include $(BUILD_SHARED_LIBRARY)
 #	TA Library
 ######################################################
 include $(CLEAR_VARS)
-LOCAL_MODULE_CLASS := EXECUTABLES
+LOCAL_MODULE_CLASS := ETC
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := $(KEYMASTER_TA_BINARY)
 LOCAL_MODULE_SUFFIX := .ta
@@ -73,7 +73,17 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := amlkeymaster_tests
 LOCAL_SRC_FILES := \
 	unit_test/android_keymaster_test.cpp \
-	unit_test/android_keymaster_test_utils.cpp
+	unit_test/android_keymaster_test_utils.cpp \
+	unit_test/attestation_record_test.cpp \
+	unit_test/authorization_set_test.cpp \
+#	unit_test/android_keymaster_messages_test.cpp \
+	unit_test/hkdf_test.cpp \
+	unit_test/hmac_test.cpp \
+	unit_test/kdf1_test.cpp \
+	unit_test/kdf2_test.cpp \
+	unit_test/kdf_test.cpp \
+	unit_test/key_blob_test.cpp \
+	unit_test/keymaster_enforcement_test.cpp
 
 LOCAL_C_INCLUDES := \
 	external/boringssl/include \
@@ -81,8 +91,11 @@ LOCAL_C_INCLUDES := \
 	system/keymaster \
 	system/security/softkeymaster/include
 
-LOCAL_CFLAGS = -Wall -Werror -Wunused
+LOCAL_CFLAGS = -Wall -Werror -Wunused -DKEYMASTER_NAME_TAGS
 LOCAL_CLANG_CFLAGS += -Wno-error=unused-const-variable -Wno-error=unused-private-field
+# TODO(krasin): reenable coverage flags, when the new Clang toolchain is released.
+# Currently, if enabled, these flags will cause an internal error in Clang.
+LOCAL_CLANG_CFLAGS += -fno-sanitize-coverage=edge,indirect-calls,8bit-counters,trace-cmp
 LOCAL_MODULE_TAGS := tests
 LOCAL_SHARED_LIBRARIES := \
 	libsoftkeymasterdevice \
