@@ -19,7 +19,7 @@ KEYMASTER_TA_BINARY := 27768e80-717d-11e5-b4b00002a5d5c51b
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := keystore.amlogic
-LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
+LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_SRC_FILES := module.cpp \
 		   optee/aml_keymaster1.cpp \
 		   optee/keymaster1_secure_api.cpp \
