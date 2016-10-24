@@ -35,7 +35,7 @@ struct tee_attr_packed {
 
 void dump_buf(const char* name, const uint8_t* buf, const size_t buf_len) {
     uint32_t i = 0;
-    LOG_D("\n========== dump %s(%d) start ======== \n", name, buf_len);
+    LOG_D("\n========== dump %s(%zd) start ======== \n", name, buf_len);
     for (i = 0; i < buf_len; i++) {
         if (i % 16 == 0) {
             if (i != 0) LOG_D("\n");
@@ -707,7 +707,7 @@ TEEC_Result load_key_ca(TEE_ObjectHandle *key, const uint8_t *id, uint32_t id_le
         LOG_D("Invoke OTZ_KEYMASTER_CMD_ID_LOAD_KEY failed with res(%x), ret_orig(%x)\n", res, ret_orig);
         goto out;
     } else {
-        *key = (TEE_ObjectHandle)op.params[2].value.a;
+        *key = (TEE_ObjectHandle)((uintptr_t)op.params[2].value.a);
     }
     ret = 0;
 out:

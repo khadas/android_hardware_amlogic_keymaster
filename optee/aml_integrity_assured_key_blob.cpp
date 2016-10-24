@@ -94,7 +94,7 @@ static keymaster_error_t ComputeHmac(const uint8_t* serialized_data, size_t seri
     HmacCleanup cleanup(&op);
 
     uint8_t tmp[EVP_MAX_MD_SIZE];
-    unsigned tmp_len = EVP_MAX_MD_SIZE;
+    size_t tmp_len = EVP_MAX_MD_SIZE;
     if (!verify) {
         if (KM1_hmac_update(op, serialized_data, serialized_data_size) ||
                 KM1_hmac_update(op, hidden_bytes.get(), hidden_bytes_size) ||  //

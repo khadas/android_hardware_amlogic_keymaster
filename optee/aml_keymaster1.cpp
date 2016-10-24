@@ -185,19 +185,19 @@ struct am_operations {
     keymaster_purpose_t purpose;
     keymaster_padding_t padding;
     keymaster_block_mode_t block_mode;
-    uint32_t key_len; /* in bits */
-    size_t min_mac_length;
-    size_t mac_length;
+    size_t key_len; /* in bits */
+    uint32_t min_mac_length;
+    uint32_t mac_length;
     /* internal buffer for each cipher */
     Buffer buffer;
     /* AAD buffer for AES GCM mode */
     Buffer aad_buf;
-    /* data come in or not for AES GCM mode*/
-    bool aes_data_start;
     /* tag length for AES GCM mode */
-    uint32_t tag_len;
+    size_t tag_len;
     /* data size which will be reserve for each AES updation */
     uint32_t aes_data_to_hold;
+    /* data come in or not for AES GCM mode*/
+    bool aes_data_start;
 };
 typedef struct am_operations am_operations_t;
 
@@ -804,7 +804,7 @@ keymaster_error_t aml_export_key(const struct keymaster1_device* dev __unused,
     keymaster_algorithm_t algorithm;
     const aml_keyblob_t* aml_key = nullptr;
     uint8_t* buf = nullptr;
-    uint32_t buf_len = 0;
+    size_t buf_len = 0;
 
     if (!export_data) {
         LOG_E("invalid output", 0);
@@ -1688,7 +1688,7 @@ out:
     return error;
 }
 
-keymaster_error_t store_data(const uint8_t* src, const uint32_t src_len,
+keymaster_error_t store_data(const uint8_t* src, const size_t src_len,
         const keymaster_algorithm_t algorithm,
         const uint32_t key_len,
         Buffer& dst, size_t* input_consumed)
@@ -1737,7 +1737,7 @@ keymaster_error_t aes_internal_update_v1(const TEE_OperationHandle op,
                                           const uint8_t* in, const uint32_t in_len,
                                           const uint32_t data_to_hold,
                                           Buffer& ibuf,
-                                          uint32_t* input_consumed,
+                                          size_t* input_consumed,
                                           uint8_t** out, uint32_t* out_len)
 {
     keymaster_error_t error = KM_ERROR_OK;
@@ -1748,7 +1748,7 @@ keymaster_error_t aes_internal_update_v1(const TEE_OperationHandle op,
     uint32_t need_optee_buffering = 0;
     UniquePtr<uint8_t[]> tmp;
     UniquePtr<uint8_t[]> out_tmp;
-    uint32_t out_tmp_len = 0;
+    size_t out_tmp_len = 0;
 
     *input_consumed = in_len;
 
@@ -2021,7 +2021,7 @@ static keymaster_error_t zero_pad_left(UniquePtr<uint8_t[]>* dest, size_t padded
 
 static keymaster_error_t asymmetric_sign_undigested(am_operations_t* handles,
         UniquePtr<uint8_t[]>& sig,
-        uint32_t* sig_len)
+        size_t* sig_len)
 {
     keymaster_error_t error = KM_ERROR_OK;
     const keymaster_algorithm_t algorithm = handles->algorithm;
@@ -2143,12 +2143,12 @@ out:
 
 static keymaster_error_t asymmetric_sign_digested(const am_operations_t* handles,
         UniquePtr<uint8_t[]>& sig,
-        uint32_t* sig_len)
+        size_t* sig_len)
 
 {
     keymaster_error_t error = KM_ERROR_OK;
     uint8_t digest[128] = {0};
-    uint32_t digest_len= sizeof(digest);
+    size_t digest_len = sizeof(digest);
 
     error = KM1_digest_final(handles->digest,
             NULL, 0,
@@ -2253,7 +2253,7 @@ keymaster_error_t aml_finish(const struct keymaster1_device* dev __unused,
     am_operations_t *handles = nullptr;
     keymaster_purpose_t purpose;
     keymaster_algorithm_t algorithm;
-    uint32_t sig_len = 0;
+    size_t sig_len = 0;
     UniquePtr<uint8_t[]> sig;
     UniquePtr<uint8_t[]> tmp;
 
@@ -2384,12 +2384,12 @@ keymaster_error_t aml_finish(const struct keymaster1_device* dev __unused,
         }
     } else if (algorithm == KM_ALGORITHM_AES) {
         Buffer out_buf;
-        uint32_t out_len = 0;
+        size_t out_len = 0;
 
         if (handles->block_mode == KM_MODE_GCM) {
             const uint8_t* in = handles->buffer.peek_read();
             uint32_t in_len = handles->buffer.available_read();
-            uint32_t tag_len = handles->tag_len;
+            size_t tag_len = handles->tag_len;
             UniquePtr<uint8_t[]> out_tmp;
             Buffer& aad_buf = handles->aad_buf;
 
@@ -2427,7 +2427,7 @@ keymaster_error_t aml_finish(const struct keymaster1_device* dev __unused,
             } else if (handles->purpose == KM_PURPOSE_ENCRYPT) {
                 UniquePtr<uint8_t[]> tag;
                 UniquePtr<uint8_t[]> out_local;
-                uint32_t out_local_len = 0;
+                size_t out_local_len = 0;
 
                 /* In case in_len is 0, we still need to provide big enough buffer for optee */
                 out_local_len = in_len? in_len : AES_BLOCK_SIZE;
@@ -2513,7 +2513,7 @@ keymaster_error_t aml_finish(const struct keymaster1_device* dev __unused,
             }
         }
     } else if (algorithm == KM_ALGORITHM_HMAC) {
-        uint32_t digest_len = MAX_DIGEST_SIZE;
+        size_t digest_len = MAX_DIGEST_SIZE;
         uint8_t digest[MAX_DIGEST_SIZE];
         switch (purpose)
         {
