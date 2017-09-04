@@ -122,6 +122,7 @@ AmlKeymasterDevice::AmlKeymasterDevice(const hw_module_t* module) {
     error_ = translate_error(rc);
     if (rc != TEEC_SUCCESS) {
         ALOGE("failed to connect to keymaster (0x%x)", rc);
+        error_ = KM_ERROR_SECURE_HW_COMMUNICATION_FAILED;
         return;
     }
 
@@ -144,7 +145,8 @@ AmlKeymasterDevice::AmlKeymasterDevice(const hw_module_t* module) {
 }
 
 AmlKeymasterDevice::~AmlKeymasterDevice() {
-    aml_keymaster_disconnect(&KM_context, &KM_session);
+   if (KM_session.ctx != NULL)
+       aml_keymaster_disconnect(&KM_context, &KM_session);
 }
 
 namespace {
