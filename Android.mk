@@ -63,7 +63,15 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := $(KEYMASTER_TA_BINARY)
 LOCAL_MODULE_SUFFIX := .ta
 LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/teetz
+ifeq ($(TARGET_ENABLE_TA_SIGN), true)
+$(info $(shell mkdir $(ANDROID_BUILD_TOP)/$(LOCAL_PATH)/signed))
+$(info $(shell $(ANDROID_BUILD_TOP)/vendor/amlogic/tdk/ta_export/scripts/sign_ta_auto.py \
+		--in=$(ANDROID_BUILD_TOP)/$(LOCAL_PATH)/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX) \
+		--out=$(ANDROID_BUILD_TOP)/$(LOCAL_PATH)/signed/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)))
+LOCAL_SRC_FILES := signed/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
+else
 LOCAL_SRC_FILES := $(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
+endif
 include $(BUILD_PREBUILT)
 
 
