@@ -768,13 +768,14 @@ keymaster_error_t AmlKeymasterDevice::finish(keymaster_operation_handle_t operat
                                                 keymaster_blob_t* output) {
     ALOGD("Device received finish");
 
+    bool size_exceeded = false;
     if (error_ != KM_ERROR_OK) {
         return error_;
     }
     if (input && input->data_length > kMaximumFinishInputLength) {
         ALOGE("%zu-byte input to finish; only %zu bytes allowed",
                 input->data_length, kMaximumFinishInputLength);
-        return KM_ERROR_INVALID_INPUT_LENGTH;
+        size_exceeded = true;
     }
 
     if (out_params) {
@@ -790,7 +791,11 @@ keymaster_error_t AmlKeymasterDevice::finish(keymaster_operation_handle_t operat
         request.signature.Reinitialize(signature->data, signature->data_length);
     }
     if (input && input->data && input->data_length) {
-        request.input.Reinitialize(input->data, input->data_length);
+        /* sending fake request to close operation handle */
+        if (size_exceeded)
+            request.input.Reinitialize(input->data, 1);
+        else
+            request.input.Reinitialize(input->data, input->data_length);
     }
     if (in_params) {
         request.additional_params.Reinitialize(*in_params);
@@ -798,6 +803,9 @@ keymaster_error_t AmlKeymasterDevice::finish(keymaster_operation_handle_t operat
 
     FinishOperationResponse response;
     keymaster_error_t err = Send(KM_FINISH_OPERATION, request, &response);
+    /* drop result in case of fake request */
+    if (size_exceeded)
+        return KM_ERROR_INVALID_INPUT_LENGTH;
     if (err != KM_ERROR_OK) {
         return err;
     }
